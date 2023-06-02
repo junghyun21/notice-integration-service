@@ -10,6 +10,7 @@ from selenium.webdriver.common.keys import Keys
 from flask import Flask
 from bs4 import Tag
 
+import requests
 from bs4 import BeautifulSoup
 import json
 
@@ -128,12 +129,20 @@ def main():
     # data = json.dumps(instagram)
     data = json.dumps(instagram, indent=4, ensure_ascii=False)
 
+    # 보낼 스프링 부트 서버 주소 -> ec2 주소 + 아래 데이터 받는 api
+    urlspring = 'http://ec2-3-39-206-176.ap-northeast-2.compute.amazonaws.com:8080/savedata/insta'
+    # 보내기 실행
+    response = requests.post(urlspring, data=data, headers={'Content-Type': 'application/json'})
+
     # print(data)
 
 
 # ==========================================================================
 # ========================= 코드 주기적으로 자동 실행 ============================
 # ==========================================================================
+
+app = Flask(__name__)
+app.run('0.0.0.0', port=5000, debug=True)
 
 # BackgroundScheduler 를 사용 시,
 # stat를 먼저 -> add_job 을 이용해 수행할 것을 등록
@@ -143,10 +152,10 @@ sched.start()
 # interval - 매 3초마다 실행
 # sched.add_job(main, 'interval', seconds=3, id="test_2")
 
-# cron 사용 - 매 5분마다 job 실행
+# cron 사용 - 매 10분마다 job 실행
 # 	: id 는 고유 수행번호로 겹치면 수행되지 않습니다.
 # 	만약 겹치면 다음의 에러 발생 => 'Job identifier (test_1) conflicts with an existing job'
-sched.add_job(main, 'cron', minute='*/5', id="main")
+sched.add_job(main, 'cron', minute='*/10', id="main")
 
 # cron 으로 하는 경우는 다음과 같이 파라미터를 상황에 따라 여러개 넣어도 됩니다.
 # 	매시간 0분 0초에 실행한다는 의미
@@ -155,6 +164,3 @@ sched.add_job(main, 'cron', minute='*/5', id="main")
 while True:
     print("Running main process...............")
     time.sleep(1)
-
-    
-
