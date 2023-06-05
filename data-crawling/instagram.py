@@ -10,6 +10,8 @@ from selenium.webdriver.common.keys import Keys
 from flask import Flask
 from bs4 import Tag
 
+from urllib.request import urlopen
+from urllib import parse
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -18,6 +20,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.base import JobLookupError
 import time
 
+LOCATION = "./img/" # 이미지를 저장할 위치 -> 수정하시면 됩니다
 
 ID = "moassu23"
 PW = "moassu2023"
@@ -74,6 +77,20 @@ def get_imgs(html):
     return imgs
 
 
+# 저장한 이미지의 링크를 통해 이미지 저장
+# instagram: 인스타그램에서 크롤링해온 모든 데이터를 저장한 리스트
+def save_img(instagram):
+    n = 0
+    for i in instagram:
+        # instagram 리스트 내 요소 중 썸네일(img) 사진 가져옴
+        with urlopen(i['img']) as f:
+            # 해당 썸네일이 저장된 리스트의 인덱스 == n (저장할 이미지의 이름)
+            with open(LOCATION + str(n) + '.jpg', 'wb') as h:
+                img = f.read()
+                h.write(img)
+        n += 1
+
+
 # ============= 추출한 데이터들을 JSON 파일로 변환하여 저장 ==============
 # - 모든 데이터를 저장하고 있는 리스트의 값을 바탕으로 JSON 파일 생성
 # * parameter: homepage_global -> 소프트웨어 공지사항에서 추출한 모든 데이터
@@ -124,7 +141,13 @@ def main():
 
             dic = dict(zip(dic_keys, [admin, url, img]))
             instagram.append(dic)
-    
+        
+    # 이미지 저장
+    save_img(instagram)
+
+    # 창 닫기
+    browser.close()
+
     # toJSON(instagram)
     # data = json.dumps(instagram)
     data = json.dumps(instagram, indent=4, ensure_ascii=False)
@@ -133,8 +156,6 @@ def main():
     urlspring = 'http://ec2-3-39-206-176.ap-northeast-2.compute.amazonaws.com:8080/savedata/insta'
     # 보내기 실행
     response = requests.post(urlspring, data=data, headers={'Content-Type': 'application/json'})
-
-    # print(data)
 
 
 # ==========================================================================
