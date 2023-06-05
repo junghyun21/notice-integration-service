@@ -28,7 +28,7 @@ PAGE_NUM = 10 # 1~10페이지까지 크롤링, 크롤링할 페이지 변경시�
 # # - 모든 데이터를 저장하고 있는 리스트의 값을 바탕으로 JSON 파일 생성
 # # * parameter: homepage_computer -> 컴퓨터학부 공지사항에서 추출한 모든 데이터
 # def toJSON(homepage_univ):
-#     file_path = "./json/homepage_univ.json"
+#     file_path = "./homepage_univ.json"
     
 # #     with open(file_path, 'w', encoding='utf-8') as file:
 # #     json.dump(data, file, indent="\t")
@@ -167,7 +167,6 @@ def main():
     response = requests.post(urlspring, data=data, headers={'Content-Type': 'application/json'})
 
     # print(data)
-
 
 # ==========================================================================
 # ========================= 코드 주기적으로 자동 실행 ============================

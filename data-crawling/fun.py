@@ -129,7 +129,6 @@ def get_applyPeriods(html):
         end = end[:10]
 
         period = [start, end]
-        print("apply: ", period)
         
         applyPeriods.append(period)
         
@@ -162,8 +161,6 @@ def get_operatePeriods(html):
         end = end[:10]
         
         period = [start, end]
-
-        print("operate: ", period)
         
         operatePeriods.append(period)
         
@@ -395,6 +392,8 @@ def main():
         fun_system[i]['target'] = targets.text if isinstance(targets, Tag) else targets
         fun_system[i]['attach'] = attachs.text if isinstance(attachs, Tag) else attachs
         
+        print(fun_system)
+
         # print(fun_system[i]['category'], fun_system[i]['title'], fun_system[i]['cover'])
 
     # toJSON(fun_system)
