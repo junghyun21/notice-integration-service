@@ -1,9 +1,12 @@
 # dic = {
 #     'admin': '학생회이름',
 #     'url': 게시글 url,
-#     'img': 대표사진}
+#     'title': 게시글 제목,
+#     'content': 게시글 내용,
+#     'date': 게시글 작성일자}
 
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
@@ -20,7 +23,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.base import JobLookupError
 import time
 
-LOCATION = "./img/" # 이미지를 저장할 위치 -> 수정하시면 됩니다
 
 ID = "moassu23"
 PW = "moassu2023"
@@ -36,6 +38,11 @@ ID_ELECTRONIC = "ssu_electronic_engineering" # 전자정보공학부 학생회
 ID_AI = "ssu_ai_conv" # AI융합학부 학생회
 
 
+# 이모티콘을 제거하는 함수
+# utf-8 코드에 해당하지 않는 텍스트 데이터 모두 무시
+def remove_emoji(string):
+    return string.encode('utf-8', 'ignore').decode('utf-8')
+
 # 인스타그램에 로그인하는 함수
 # * parameter: browser -> 현재 접속해있는, 로그인을 실행해야하는 화면
 def login(browser):
@@ -49,7 +56,7 @@ def login(browser):
 
 def get_html(browser):
     html = BeautifulSoup(browser.page_source, 'html.parser')
-    print(html)
+
     return html
 
 
@@ -65,30 +72,41 @@ def get_urls(html):
     return urls
 
 
-def get_imgs(html):
-    imgs = []
+# 인스타그램 게시물의 내용을 가져옴
+def get_content(html):
+    content = html.select_one("div._a9zr > div._a9zs > h1").get_text()
 
-    unprocessed_imgs = html.select("div._ac7v._al3n > div._aabd._aa8k._al3l img")
-
-    for i in unprocessed_imgs:
-        img = i.attrs["src"]
-        imgs.append(img)
-
-    return imgs
+    return content
 
 
-# 저장한 이미지의 링크를 통해 이미지 저장
-# instagram: 인스타그램에서 크롤링해온 모든 데이터를 저장한 리스트
-def save_img(instagram):
-    n = 0
-    for i in instagram:
-        # instagram 리스트 내 요소 중 썸네일(img) 사진 가져옴
-        with urlopen(i['img']) as f:
-            # 해당 썸네일이 저장된 리스트의 인덱스 == n (저장할 이미지의 이름)
-            with open(LOCATION + str(n) + '.jpg', 'wb') as h:
-                img = f.read()
-                h.write(img)
-        n += 1
+# 제목 추출
+def get_title(html):
+    title = str(html.select_one("div._a9zr > div._a9zs > h1"))
+
+    # <h1 class="_aacl _aaco _aacu _aacx _aad7 _aade" dir="auto"> ... <br/>
+    start_index = title.find('>') + 1
+    end_index = title.find('<br/>')
+
+    title = title[start_index:end_index].strip()
+
+    # '<', '>'의 경우 str로 변환 시 -> &lt;, &gt; 로 변환
+    # 이를 제거해주는 작업 필요
+    if title[0] == '&':
+        title = title[4: len(title)-4].strip()
+    
+    if title[0] == '[':
+        title = title[1: len(title)-1].strip()
+
+    return title
+
+
+# 게시물의 작성 일자 추출
+def get_date(html):
+    date = html.select_one("time._aaqe").attrs["datetime"]
+
+    # 기존: 2023-06-15T05:24:04.000Z
+    # 가공: 2023-06-15
+    return date[:10]
 
 
 # ============= 추출한 데이터들을 JSON 파일로 변환하여 저장 ==============
@@ -106,7 +124,7 @@ def main():
     # 리스트의 각 요소들은 각 공지사항에서 추출한 모든 데이터를 담고 있는 딕셔너리
     instagram = []
     # 각 게시글에서 추출할 데이터 리스트
-    dic_keys = ['admin', 'url', 'img']
+    dic_keys = ['admin', 'url', 'title', 'content', 'date']
 
     # 크롤링해야하는 인스타그램 계정들의 정보
     admins = ["총학생회", "IT대학생회", "컴퓨터학부학생회", "소프트웨어학부학생회", "글로벌미디어학부학생회", "전자정보공학부학생회", "AI융합학부학생회"]
@@ -114,7 +132,9 @@ def main():
 
     # chromedriver_mac_arm64.zip
     # version: 113.0.5672.63
-    browser = webdriver.Chrome('./chromedriver')
+    options = webdriver.ChromeOptions()
+    service = ChromeService(executable_path='./chromedriver')
+    browser = webdriver.Chrome(service=service, options=options)
     browser.set_window_size(999, 777)
     browser.get(BASE_URL)
     time.sleep(10)
@@ -122,7 +142,7 @@ def main():
     # 인스타그램 로그인
     login(browser)
     
-    # 각 학생회 계정에 접속하여 계정 내 게시글의 사진과 링크 긁어오기
+    # 각 학생회 계정에 접속하여 계정 내 게시글의 제목과 링크 긁어오기
     for id, admin in zip(ids, admins):
         url = BASE_URL + '/' + id
         browser.get(url)
@@ -132,18 +152,26 @@ def main():
         html = BeautifulSoup(browser.page_source, 'html.parser')
 
         urls = get_urls(html)
-        imgs = get_imgs(html)
 
-        for url, img in zip(urls, imgs):
-            admin = admin.text if isinstance(admin, Tag) else admin
+        for url in urls:
+            # 각각의 학생회 게시글 내의 html 가져오기
+            browser.get(url)
+            time.sleep(5)
+            html = BeautifulSoup(browser.page_source, 'html.parser')
+
+            
+            content = get_content(html)
+            title = get_title(html)
+            date = get_date(html)
+
             url = url.text if isinstance(url, Tag) else url
-            img = img.text if isinstance(img, Tag) else img
+            content = content.text if isinstance(content, Tag) else content
+            title = title.text if isinstance(title, Tag) else title
+            date = date.text if isinstance(date, Tag) else date
 
-            dic = dict(zip(dic_keys, [admin, url, img]))
+            # 딕셔너리에 작성자, 게시글 링크, 제목 저장 후 -> 리스트에 추가
+            dic = dict(zip(dic_keys, [admin, url, title, content, date]))
             instagram.append(dic)
-        
-    # 이미지 저장
-    save_img(instagram)
 
     # 창 닫기
     browser.close()
